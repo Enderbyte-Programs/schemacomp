@@ -259,7 +259,7 @@ def main(stdscr):
             elif viewoption == 1:
                 cursesplus.textview(stdscr,text=textual_report_3)
 
-            if viewoption == 3:
+            if viewoption == 2:
                 return
 
     

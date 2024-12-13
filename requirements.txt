@@ -3,3 +3,4 @@ pandas
 pymssql
 pymysql
 openpyxl
+xlsxwriter
