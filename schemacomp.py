@@ -152,7 +152,6 @@ def find_matching_column(haystack,needle) -> dict|None:
             return d
     return None
 
-
 def main(stdscr):
     cursesplus.displaymsg(stdscr,[
         "===== SCHEMACOMP =====",
@@ -183,15 +182,14 @@ def main(stdscr):
     data1 = server1.run_query(f"select * from INFORMATION_SCHEMA.COLUMNS where TABLE_CATALOG = '{server1.db}' order by TABLE_SCHEMA, TABLE_NAME, ORDINAL_POSITION ")
     prog.step("Loading from server 2",True)
     data2 = server2.run_query(f"select * from INFORMATION_SCHEMA.COLUMNS where TABLE_CATALOG = '{server2.db}' order by TABLE_SCHEMA, TABLE_NAME, ORDINAL_POSITION ")
-    prog.max = 3*max([len(data1),len(data2)])+5
+    prog.max = 2*max([len(data1),len(data2)])+5
     prog.appendlog(f"Server 1 has a total of {len(data1)} columns.")
     prog.appendlog(f"Server 2 has a total of {len(data2)} columns.")
 
     #Now time to process
     prog.appendlog("Running test 1")
 
-    missing_columns_2 = []
-    missing_columns_1 = []
+    missing_columns_2:list[str] = []
     textual_report_1 = ""
 
     for column in data1:
@@ -205,24 +203,10 @@ def main(stdscr):
             missing_columns_2.append(coolname)
         else:
             continue
-    
-    prog.appendlog("Running test 2")
-    textual_report_2 = ""
-    for column in data2:
-        #Each row
-        coolname = column["TABLE_SCHEMA"]+"."+column["TABLE_NAME"]+"."+column["COLUMN_NAME"]
-        #Will be used as an id
-        prog.step(coolname)
-        namex = find_matching_column(data1,coolname)
-        if namex is None:
-            textual_report_2 += f"The column {coolname} could not be found on server 1.\n\n"
-            missing_columns_1.append(coolname)
-        else:
-            continue
 
     textual_report_3 = ""
     mismatched_columns:list[list[dict]] = []
-    prog.appendlog("Running test 3")
+    prog.appendlog("Running test 2")
     for column in data1:
         #Each row again
         coolname = column["TABLE_SCHEMA"]+"."+column["TABLE_NAME"]+"."+column["COLUMN_NAME"]
@@ -236,18 +220,43 @@ def main(stdscr):
             if src_index != dest_index:
                 mismatched_columns.append([column,matcher])
                 textual_report_3 += f"{coolname} mismatched position: On server 1 it is {src_index}, but on server 2 it is {dest_index}\n\n"
+    if writefile:
+        prog.step("Saving data")
+
+        missing_column_table = pandas.DataFrame(columns=["Table Schema","Table Name","Column Name"])
+        for missingcolumn in missing_columns_2:
+            missing_column_table.loc[len(missing_column_table)] = missingcolumn.split(".")
+
+        mismatch_table = pandas.DataFrame(columns=["Table Schema","Table Name","Column Name","Server 1 Ordinal Position","Server 2 Ordinal Position"])
+        for mismatch in mismatched_columns:
+            mismatch_table.loc[len(mismatch_table)] = [mismatch[0]["TABLE_SCHEMA"],mismatch[0]["TABLE_NAME"],mismatch[0]["COLUMN_NAME"],mismatch[0]["ORDINAL_POSITION"],mismatch[1]["ORDINAL_POSITION"]]
+
+        dfs = {"Missing Columns":missing_column_table,"Mismatched Columns":mismatch_table}
+
+        with pandas.ExcelWriter(outputpath) as writer:
+            #missing_column_table.to_excel(writer,sheet_name="Missing Columns",index=False)
+            #mismatch_table.to_excel(writer,sheet_name="Mismatched Columns",index=False)
+            for sheetname, df in dfs.items():  # loop through `dict` of dataframes
+                df.to_excel(writer, sheet_name=sheetname,index=False)  # send df to writer
+                worksheet = writer.sheets[sheetname]  # pull worksheet object
+                for idx, col in enumerate(df):  # loop through all columns
+                    series = df[col]
+                    max_len = max((
+                        series.astype(str).map(len).max(),  # len of largest item
+                        len(str(series.name))  # len of column name/header
+                        )) + 1  # adding a little extra space
+                    worksheet.set_column(idx, idx, max_len)  # set column width
+
+    cursesplus.messagebox.showinfo(stdscr,["Finished successfully."])
 
     if showonscreen:
         while True:
-            viewoption = cursesplus.coloured_option_menu(stdscr,["Columns not found on server 2","Columns not found on server 1","Disordered columns (1 -> 2)","Quit program"],"Data Results")
+            viewoption = cursesplus.coloured_option_menu(stdscr,["Columns not found on server 2","Disordered columns (1 -> 2)","Quit program"],"Data Results")
 
             if viewoption == 0:
                 cursesplus.textview(stdscr,text=textual_report_1)
 
             elif viewoption == 1:
-                cursesplus.textview(stdscr,text=textual_report_2)
-
-            elif viewoption == 2:
                 cursesplus.textview(stdscr,text=textual_report_3)
 
             if viewoption == 3:
