@@ -190,7 +190,8 @@ def main(stdscr):
     #Now time to process
     prog.appendlog("Running test 1")
 
-    missing_columns = []
+    missing_columns_2 = []
+    missing_columns_1 = []
     textual_report_1 = ""
 
     for column in data1:
@@ -201,15 +202,53 @@ def main(stdscr):
         namex = find_matching_column(data2,coolname)
         if namex is None:
             textual_report_1 += f"The column {coolname} could not be found on server 2.\n\n"
-            missing_columns.append(coolname)
+            missing_columns_2.append(coolname)
         else:
             continue
+    
+    prog.appendlog("Running test 2")
+    textual_report_2 = ""
+    for column in data2:
+        #Each row
+        coolname = column["TABLE_SCHEMA"]+"."+column["TABLE_NAME"]+"."+column["COLUMN_NAME"]
+        #Will be used as an id
+        prog.step(coolname)
+        namex = find_matching_column(data1,coolname)
+        if namex is None:
+            textual_report_2 += f"The column {coolname} could not be found on server 1.\n\n"
+            missing_columns_1.append(coolname)
+        else:
+            continue
+
+    textual_report_3 = ""
+    mismatched_columns:list[list[dict]] = []
+    prog.appendlog("Running test 3")
+    for column in data1:
+        #Each row again
+        coolname = column["TABLE_SCHEMA"]+"."+column["TABLE_NAME"]+"."+column["COLUMN_NAME"]
+        #Will be used as an id
+        prog.step(coolname)
+        if not coolname in missing_columns_2:
+            #Don't lookup for missing data
+            matcher = find_matching_column(data2,coolname)
+            dest_index = matcher["ORDINAL_POSITION"]
+            src_index = column["ORDINAL_POSITION"]
+            if src_index != dest_index:
+                mismatched_columns.append([column,matcher])
+                textual_report_3 += f"{coolname} mismatched position: On server 1 it is {src_index}, but on server 2 it is {dest_index}\n\n"
+
     if showonscreen:
         while True:
             viewoption = cursesplus.coloured_option_menu(stdscr,["Columns not found on server 2","Columns not found on server 1","Disordered columns (1 -> 2)","Quit program"],"Data Results")
 
             if viewoption == 0:
                 cursesplus.textview(stdscr,text=textual_report_1)
+
+            elif viewoption == 1:
+                cursesplus.textview(stdscr,text=textual_report_2)
+
+            elif viewoption == 2:
+                cursesplus.textview(stdscr,text=textual_report_3)
 
             if viewoption == 3:
                 return
