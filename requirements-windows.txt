@@ -1,0 +1,8 @@
+cursesplus
+pandas
+pymssql
+pymysql
+openpyxl
+xlsxwriter
+pyinstaller
+windows-curses

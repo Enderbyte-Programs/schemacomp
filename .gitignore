@@ -1,1 +1,4 @@
 *.xlsx
+*.exe
+build/
+pyvenv.cfg
