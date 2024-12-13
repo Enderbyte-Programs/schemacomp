@@ -1,0 +1,4 @@
+cursesplus
+pandas
+pymssql
+pymysql
